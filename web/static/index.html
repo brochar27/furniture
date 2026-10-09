@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Harbor &amp; Grain — Inventory</title>
+  <style>
+    :root {
+      --paper: #f4efe6;
+      --ink: #1c1915;
+      --muted: #6d645b;
+      --line: #ddd4c6;
+      --card: #fbf8f3;
+      --rust: #8d3b2c;
+      --rust-deep: #6e2c21;
+      --ok: #1f6b45;
+      --warn: #8a5a12;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 100% -10%, #efe2cf 0%, transparent 55%),
+        var(--paper);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .mark {
+      font-family: "Iowan Old Style", Palatino, Georgia, serif;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+      margin: 0;
+    }
+    .mark span { color: var(--rust); }
+    .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      min-height: calc(100vh - 92px);
+    }
+    .desk { padding: 22px 28px 40px; }
+    form.search { display: flex; gap: 10px; }
+    input[type="search"], input[type="number"], input[type="text"], select, textarea {
+      font: inherit;
+      color: inherit;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    input[type="search"] { flex: 1; font-size: 16px; }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      background: var(--ink);
+      color: var(--paper);
+    }
+    button.primary { background: var(--rust); }
+    button.primary:hover { background: var(--rust-deep); }
+    button.ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    button[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
+    .chips button { padding: 7px 12px; font-size: 13px; }
+    .meta { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0 10px 8px;
+    }
+    td { padding: 12px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+    tr.result { cursor: pointer; }
+    tr.result:hover, tr.result.selected { background: rgba(141, 59, 44, 0.06); }
+    .name {
+      font-family: "Iowan Old Style", Palatino, Georgia, serif;
+      font-size: 18px;
+    }
+    .sku { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+    .qty { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .qty.low { color: var(--warn); }
+    .qty.out { color: var(--rust); }
+    aside {
+      border-left: 1px solid var(--line);
+      background: var(--card);
+      padding: 22px 22px 40px;
+    }
+    aside h2 {
+      font-family: "Iowan Old Style", Palatino, Georgia, serif;
+      font-weight: 500;
+      font-size: 26px;
+      margin: 0 0 6px;
+    }
+    .dims, .quiet { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .modes { display: flex; gap: 8px; margin: 16px 0; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+    .stack input, .stack select, .stack textarea { width: 100%; }
+    textarea { min-height: 72px; resize: vertical; }
+    .banner {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #e7f3ec;
+      color: var(--ok);
+      font-size: 14px;
+    }
+    .banner.bad { background: #f8e8e4; color: var(--rust-deep); }
+    .history { list-style: none; padding: 0; margin: 18px 0 0; }
+    .history li {
+      display: grid;
+      grid-template-columns: 72px 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+    }
+    .empty { padding: 48px 8px; color: var(--muted); }
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-left: 0; border-top: 1px solid var(--line); }
+      header { padding: 20px 16px 14px; }
+      .desk { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <p class="mark">Harbor <span>&amp;</span> Grain</p>
+      <p class="sub">Floor inventory. Search a piece, then capture what is actually on the shelf.</p>
+    </div>
+  </header>
+  <main>
+    <section class="desk">
+      <form class="search" id="search-form">
+        <input id="q" type="search" placeholder="Search sofa, SKU, walnut, oak…" autofocus />
+        <button type="submit">Search</button>
+      </form>
+      <div class="chips" id="chips"></div>
+      <p class="meta" id="meta"></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Piece</th>
+            <th>Finish</th>
+            <th>Price</th>
+            <th>On hand</th>
+            <th>Free</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="empty" id="empty" hidden>Nothing matched. Try a material, a SKU, or a category.</p>
+    </section>
+    <aside>
+      <h2 id="cap-title">Capture</h2>
+      <p class="dims" id="cap-detail">Pick a row. A count sets on-hand to what you just counted. Receive adds a delivery. Damage writes off broken stock.</p>
+      <div class="modes" id="modes">
+        <button type="button" class="ghost" data-mode="count" aria-pressed="true">Count</button>
+        <button type="button" class="ghost" data-mode="receipt">Receive</button>
+        <button type="button" class="ghost" data-mode="damage">Damage</button>
+      </div>
+      <form class="stack" id="capture-form">
+        <label for="warehouse">Warehouse</label>
+        <select id="warehouse" required></select>
+        <label for="quantity" id="qty-label">Counted on hand</label>
+        <input id="quantity" type="number" min="0" step="1" required />
+        <label for="note">Note</label>
+        <input id="note" type="text" placeholder="Bay 3, left of the oak tables" />
+        <button class="primary" type="submit" id="capture-btn" style="margin-top:16px;width:100%">Capture count</button>
+      </form>
+      <div id="banner"></div>
+      <ul class="history" id="history"></ul>
+    </aside>
+  </main>
+  <script>
+    const state = { category: "", mode: "count", selected: null, warehouses: [] };
+
+    const $ = (id) => document.getElementById(id);
+
+    function money(n) {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+    }
+
+    function qtyClass(n) {
+      if (n <= 0) return "qty out";
+      if (n <= 2) return "qty low";
+      return "qty";
+    }
+
+    async function load() {
+      const params = new URLSearchParams({ q: $("q").value, category: state.category });
+      const data = await fetch("/api/search?" + params).then((r) => r.json());
+      state.warehouses = data.warehouses;
+      renderChips(data.categories);
+      renderRows(data.results);
+      if (!state.selected && data.results[0]) select(data.results[0]);
+      else if (state.selected) {
+        const fresh = data.results.find((r) => r.id === state.selected.id);
+        if (fresh) select(fresh, false);
+      }
+      fillWarehouses();
+    }
+
+    function renderChips(categories) {
+      const chips = $("chips");
+      chips.innerHTML = "";
+      const all = document.createElement("button");
+      all.type = "button";
+      all.className = "ghost";
+      all.textContent = "All";
+      all.setAttribute("aria-pressed", state.category === "" ? "true" : "false");
+      all.onclick = () => { state.category = ""; load(); };
+      chips.appendChild(all);
+      for (const cat of categories) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ghost";
+        b.textContent = cat.name;
+        b.setAttribute("aria-pressed", state.category === cat.slug ? "true" : "false");
+        b.onclick = () => { state.category = cat.slug; load(); };
+        chips.appendChild(b);
+      }
+    }
+
+    function renderRows(results) {
+      const body = $("rows");
+      body.innerHTML = "";
+      $("empty").hidden = results.length > 0;
+      $("meta").textContent = results.length
+        ? `${results.length} variant${results.length === 1 ? "" : "s"}`
+        : "";
+      for (const row of results) {
+        const tr = document.createElement("tr");
+        tr.className = "result" + (state.selected && state.selected.id === row.id ? " selected" : "");
+        tr.innerHTML = `
+          <td><div class="name">${escapeHtml(row.product_name)}</div><div class="sku">${escapeHtml(row.sku)}</div></td>
+          <td>${escapeHtml(row.finish || "—")}<div class="sku">${escapeHtml(row.brand || "")}</div></td>
+          <td>${money(row.list_price)}</td>
+          <td class="${qtyClass(row.on_hand)}">${row.on_hand}</td>
+          <td class="${qtyClass(row.available)}">${row.available}</td>`;
+        tr.onclick = () => select(row);
+        body.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    async function select(row, resetQty = true) {
+      state.selected = row;
+      document.querySelectorAll("tr.result").forEach((tr) => {
+        tr.classList.toggle("selected", tr.querySelector(".sku")?.textContent === row.sku);
+      });
+      $("cap-title").textContent = row.product_name;
+      const dims = [row.width_cm, row.depth_cm, row.height_cm].every((n) => n != null)
+        ? `${row.width_cm} × ${row.depth_cm} × ${row.height_cm} cm`
+        : "";
+      $("cap-detail").textContent = [row.variant_name, row.materials, dims].filter(Boolean).join(" · ");
+      fillWarehouses();
+      if (resetQty && state.mode === "count") {
+        const wh = $("warehouse").value;
+        const level = row.stock.find((s) => s.warehouse_id === wh);
+        $("quantity").value = level ? level.on_hand : 0;
+      }
+      const hist = await fetch("/api/movements?variant_id=" + encodeURIComponent(row.id)).then((r) => r.json());
+      const list = $("history");
+      list.innerHTML = "";
+      for (const m of hist.movements || []) {
+        const li = document.createElement("li");
+        const when = new Date(m.occurred_at);
+        li.innerHTML = `<span>${escapeHtml(m.warehouse)}</span><span>${escapeHtml(m.movement_type)}${m.reference ? " · " + escapeHtml(m.reference) : ""}</span><strong>${m.quantity > 0 ? "+" : ""}${m.quantity}</strong>`;
+        li.title = when.toLocaleString();
+        list.appendChild(li);
+      }
+    }
+
+    function fillWarehouses() {
+      const sel = $("warehouse");
+      const current = sel.value;
+      sel.innerHTML = "";
+      const levels = new Map((state.selected?.stock || []).map((s) => [s.warehouse_id, s]));
+      for (const w of state.warehouses) {
+        const opt = document.createElement("option");
+        opt.value = w.id;
+        const level = levels.get(w.id);
+        opt.textContent = level
+          ? `${w.code} · ${level.on_hand} on hand (${level.reserved} reserved)`
+          : `${w.code} · not stocked`;
+        sel.appendChild(opt);
+      }
+      if ([...sel.options].some((o) => o.value === current)) sel.value = current;
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.querySelectorAll("#modes button").forEach((b) => {
+        b.setAttribute("aria-pressed", b.dataset.mode === mode ? "true" : "false");
+      });
+      const labels = {
+        count: ["Counted on hand", "Capture count", "0"],
+        receipt: ["Units received", "Capture receipt", "1"],
+        damage: ["Units damaged", "Capture damage", "1"],
+      };
+      $("qty-label").textContent = labels[mode][0];
+      $("capture-btn").textContent = labels[mode][1];
+      $("quantity").min = mode === "count" ? "0" : "1";
+      if (mode !== "count") $("quantity").value = "";
+      else if (state.selected) {
+        const level = state.selected.stock.find((s) => s.warehouse_id === $("warehouse").value);
+        $("quantity").value = level ? level.on_hand : 0;
+      }
+    }
+
+    $("search-form").onsubmit = (e) => { e.preventDefault(); state.selected = null; load(); };
+    $("q").addEventListener("input", () => {
+      clearTimeout($("q")._t);
+      $("q")._t = setTimeout(() => { state.selected = null; load(); }, 180);
+    });
+    document.querySelectorAll("#modes button").forEach((b) => {
+      b.onclick = () => setMode(b.dataset.mode);
+    });
+    $("warehouse").onchange = () => {
+      if (state.mode === "count" && state.selected) {
+        const level = state.selected.stock.find((s) => s.warehouse_id === $("warehouse").value);
+        $("quantity").value = level ? level.on_hand : 0;
+      }
+    };
+    $("capture-form").onsubmit = async (e) => {
+      e.preventDefault();
+      $("banner").innerHTML = "";
+      if (!state.selected) return;
+      const res = await fetch("/api/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variant_id: state.selected.id,
+          warehouse_id: $("warehouse").value,
+          mode: state.mode,
+          quantity: Number($("quantity").value),
+          note: $("note").value,
+        }),
+      });
+      const data = await res.json();
+      const banner = $("banner");
+      banner.className = "banner" + (res.ok ? "" : " bad");
+      if (!res.ok) {
+        banner.textContent = data.error;
+        return;
+      }
+      banner.textContent = data.unchanged
+        ? "Count matches the books. Nothing written."
+        : `Captured ${data.delta > 0 ? "+" : ""}${data.delta}. Now ${data.level.on_hand} on hand, ${data.level.available} free.`;
+      $("note").value = "";
+      await load();
+    };
+
+    setMode("count");
+    load();
+  </script>
+</body>
+</html>
